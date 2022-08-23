@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Text;
+using System.Linq;
 
 namespace ResetWindow
 {
@@ -127,7 +128,7 @@ namespace ResetWindow
             public int Right { get; set; }
             public int Bottom { get; set; }
         }
-        
+
         public class LogWriter
         {
             private static LogWriter instance;
@@ -764,7 +765,7 @@ namespace ResetWindow
                             PreventClosure(false);
                             return;
                         }
-                        Console.WriteLine(counter+"] Waiting 3s for window startup...");
+                        Console.WriteLine(counter + "] Waiting 3s for window startup...");
                         Thread.Sleep(3000);
                         AutoResetWindow(args);
                         return;
@@ -866,6 +867,73 @@ namespace ResetWindow
             StringBuilder sb = new StringBuilder(txt);
             SendMessage3(hTextBox, WM_SETTEXT, sb.Capacity, sb);
             return sb.ToString();
+        }
+
+        /**
+         * Possible values for 'value' are:
+            SW_HIDE
+            0 	Hides the window and activates another window.
+            SW_SHOWNORMAL
+            SW_NORMAL
+            1 	Activates and displays a window. If the window is minimized or maximized, the system restores it to its original size and position. An application should specify this flag when displaying the window for the first time.
+            SW_SHOWMINIMIZED
+            2 	Activates the window and displays it as a minimized window.
+            SW_SHOWMAXIMIZED
+            SW_MAXIMIZE
+            3 	Activates the window and displays it as a maximized window.
+            SW_SHOWNOACTIVATE
+            4 	Displays a window in its most recent size and position. This value is similar to SW_SHOWNORMAL, except that the window is not activated.
+            SW_SHOW
+            5 	Activates the window and displays it in its current size and position.
+            SW_MINIMIZE
+            6 	Minimizes the specified window and activates the next top-level window in the Z order.
+            SW_SHOWMINNOACTIVE
+            7 	Displays the window as a minimized window. This value is similar to SW_SHOWMINIMIZED, except the window is not activated.
+            SW_SHOWNA
+            8 	Displays the window in its current size and position. This value is similar to SW_SHOW, except that the window is not activated.
+            SW_RESTORE
+            9 	Activates and displays the window. If the window is minimized or maximized, the system restores it to its original size and position. An application should specify this flag when restoring a minimized window.
+            SW_SHOWDEFAULT
+            10 	Sets the show state based on the SW_ value specified in the STARTUPINFO structure passed to the CreateProcess function by the program that started the application.
+            SW_FORCEMINIMIZE
+            11 	Minimizes a window, even if the thread that owns the window is not responding. This flag should only be used when minimizing windows from a different thread.
+         */
+        static void ShowMyWindow()
+        {
+            List<KeyValuePair<string, int>> actions = new List<KeyValuePair<string, int>>()
+            {
+                new KeyValuePair<string, int>("SW_HIDE", 0),
+                new KeyValuePair<string, int>("SW_SHOWNORMAL", 1),
+                new KeyValuePair<string, int>("SW_NORMAL", 1),
+                new KeyValuePair<string, int>("SW_SHOWMINIMIZED", 2),
+                new KeyValuePair<string, int>("SW_SHOWMAXIMIZED", 3),
+                new KeyValuePair<string, int>("SW_MAXIMIZE", 3),
+                new KeyValuePair<string, int>("SW_SHOWNOACTIVATE", 4),
+                new KeyValuePair<string, int>("SW_SHOW", 5),
+                new KeyValuePair<string, int>("SW_MINIMIZE", 6),
+                new KeyValuePair<string, int>("SW_SHOWMINNOACTIVE", 7),
+                new KeyValuePair<string, int>("SW_SHOWNA", 8),
+                new KeyValuePair<string, int>("SW_RESTORE", 9),
+                new KeyValuePair<string, int>("SW_SHOWDEFAULT", 10),
+                new KeyValuePair<string, int>("SW_FORCEMINIMIZE", 11)
+            };
+
+            Console.Write("Handle: ");
+            IntPtr hwnd = new IntPtr(int.Parse(Console.ReadLine()));
+            Console.Write("Action: ");
+            string action = Console.ReadLine();
+
+            if (String.IsNullOrWhiteSpace(action))
+            {
+                Console.WriteLine("------------ ERROR ------------");
+                Console.WriteLine(" Action not valid!");
+                Console.WriteLine("-------------------------------");
+            }
+            else
+            {
+                int iAction = actions.First(kvp => kvp.Key.Equals(action.ToUpper())).Value;
+                ShowWindow(hwnd, iAction);
+            }
         }
         static void ShowMyWindow(bool show)
         {
@@ -984,6 +1052,9 @@ namespace ResetWindow
                 case "send click":
                     SendWindowAction(true);
                     break;
+                case "action":
+                    ShowMyWindow();
+                    break;
                 case "show":
                     ShowMyWindow(true);
                     break;
@@ -1028,6 +1099,7 @@ namespace ResetWindow
                     Console.WriteLine("\t- set rect:\t  Change Position And Dimension Of A Window");
                     Console.WriteLine("\t- set text:\t  Change The Text Of A Window Or Its Childs");
                     Console.WriteLine("\t- set visible:\t  Set Window Visibility (Foreground or Background)");
+                    Console.WriteLine("\t- action:\t  Send an action to the window");
                     Console.WriteLine("");
                     Console.WriteLine("OTHER:");
                     Console.WriteLine("\t- log on:\t  Activate Logging Into File");
