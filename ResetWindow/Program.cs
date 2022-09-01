@@ -7,6 +7,9 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Text;
 using System.Linq;
+using Newtonsoft.Json;
+using static System.Collections.Specialized.BitVector32;
+using System.Reflection;
 
 namespace ResetWindow
 {
@@ -89,6 +92,7 @@ namespace ResetWindow
         const int SWP_NOACTIVATE = 0x0010;
 
         const int SW_RESTORE = 0x0009;
+        const int SW_NORMAL = 0x0001;
         const int SW_SHOW = 0x0005;
         const int SW_HIDE = 0x0000;
 
@@ -102,6 +106,24 @@ namespace ResetWindow
         const int WM_LBUTTONDOWN = 0x201;
         const int WM_LBUTTONUP = 0x202;
         const int BM_CLICK = 0x00F5;
+
+        static readonly List<KeyValuePair<string, int>> actions = new List<KeyValuePair<string, int>>()
+            {
+                new KeyValuePair<string, int>("SW_HIDE", 0),
+                new KeyValuePair<string, int>("SW_SHOWNORMAL", 1),
+                new KeyValuePair<string, int>("SW_NORMAL", 1),
+                new KeyValuePair<string, int>("SW_SHOWMINIMIZED", 2),
+                new KeyValuePair<string, int>("SW_SHOWMAXIMIZED", 3),
+                new KeyValuePair<string, int>("SW_MAXIMIZE", 3),
+                new KeyValuePair<string, int>("SW_SHOWNOACTIVATE", 4),
+                new KeyValuePair<string, int>("SW_SHOW", 5),
+                new KeyValuePair<string, int>("SW_MINIMIZE", 6),
+                new KeyValuePair<string, int>("SW_SHOWMINNOACTIVE", 7),
+                new KeyValuePair<string, int>("SW_SHOWNA", 8),
+                new KeyValuePair<string, int>("SW_RESTORE", 9),
+                new KeyValuePair<string, int>("SW_SHOWDEFAULT", 10),
+                new KeyValuePair<string, int>("SW_FORCEMINIMIZE", 11)
+            };
 
         enum KeyModifier
         {
@@ -185,8 +207,33 @@ namespace ResetWindow
         static Timer t;
         static String tmp = "";
 
+        private static Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            var currentAssembly = Assembly.GetExecutingAssembly();
+            var requireDllName = $"{(new AssemblyName(args.Name).Name)}.dll";
+            var resource = currentAssembly.GetManifestResourceNames().Where(s => s.EndsWith(requireDllName)).FirstOrDefault();
+
+            if (resource != null)
+            {
+                using (var stream = currentAssembly.GetManifestResourceStream(resource))
+                {
+                    if (stream == null)
+                    {
+                        return null;
+                    }
+
+                    var block = new byte[stream.Length];
+                    stream.Read(block, 0, block.Length);
+                    return Assembly.Load(block);
+                }
+            }
+            else { return null; }
+        }
+
         static void Main(string[] args)
         {
+            AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+
             Console.BackgroundColor = ConsoleColor.DarkGray;
             Console.ForegroundColor = ConsoleColor.White;
             Console.Title = "ResetWindowApp";
@@ -196,10 +243,19 @@ namespace ResetWindow
             //logFile = null;
 
             if (args.Length <= 0)
+            {
                 PreventClosure(true);
+            }
+            else if (args.Length == 1)
+            {
+                ReadConfig(args[0]);
+            }
             else
+            {
                 AutoResetWindow(args);
+            }
         }
+
         public static IntPtr SearchForWindow(string wndclass, string title)
         {
             SearchData sd = new SearchData { Wndclass = wndclass, Title = title };
@@ -597,15 +653,12 @@ namespace ResetWindow
             {
                 string window = args[0];
                 string title = "";
-                int xArg;
-                int yArg;
                 int widthArg = 0;
                 int heightArg = 0;
-                IntPtr handle = IntPtr.Zero;
                 Rect CurrentPosition = new Rect();
 
-                int.TryParse(args[1], out xArg);
-                int.TryParse(args[2], out yArg);
+                int.TryParse(args[1], out int xArg);
+                int.TryParse(args[2], out int yArg);
 
                 if (args.Length >= 5)
                 {
@@ -617,27 +670,12 @@ namespace ResetWindow
                         title = args[5];
                     }
                 }
-                /*Console.WriteLine(xArg + " - " + args[1] + "-" + args[1].Length);
-                Console.WriteLine(yArg + " - " + args[2] + "-" + args[2].Length + " - " + yArg.GetType());
-                Console.WriteLine(widthArg + " - " + args[3] + "-" + args[3].Length);
-                Console.WriteLine(heightArg + " - " + args[4] + "-" + args[4].Length);
-
-                Console.WriteLine(xArg > 0);
-                Console.WriteLine(xArg.ToString() == args[1]);
-                Console.WriteLine(yArg > 0);
-                Console.WriteLine(yArg.ToString() == args[2]);*/
-
-                /*Console.WriteLine("####################");
-                foreach (string arg in args)
-                {
-                    Console.WriteLine(arg);
-                }
-                Console.ReadLine();*/
 
                 if (xArg.ToString() == args[1] && yArg.ToString() == args[2])
                 {
                     Console.WriteLine("Trying to set position for " + window);
 
+                    IntPtr handle;
                     if (String.IsNullOrWhiteSpace(title))
                         handle = SearchForWindow(window, "*");
                     else
@@ -900,24 +938,6 @@ namespace ResetWindow
          */
         static void ShowMyWindow()
         {
-            List<KeyValuePair<string, int>> actions = new List<KeyValuePair<string, int>>()
-            {
-                new KeyValuePair<string, int>("SW_HIDE", 0),
-                new KeyValuePair<string, int>("SW_SHOWNORMAL", 1),
-                new KeyValuePair<string, int>("SW_NORMAL", 1),
-                new KeyValuePair<string, int>("SW_SHOWMINIMIZED", 2),
-                new KeyValuePair<string, int>("SW_SHOWMAXIMIZED", 3),
-                new KeyValuePair<string, int>("SW_MAXIMIZE", 3),
-                new KeyValuePair<string, int>("SW_SHOWNOACTIVATE", 4),
-                new KeyValuePair<string, int>("SW_SHOW", 5),
-                new KeyValuePair<string, int>("SW_MINIMIZE", 6),
-                new KeyValuePair<string, int>("SW_SHOWMINNOACTIVE", 7),
-                new KeyValuePair<string, int>("SW_SHOWNA", 8),
-                new KeyValuePair<string, int>("SW_RESTORE", 9),
-                new KeyValuePair<string, int>("SW_SHOWDEFAULT", 10),
-                new KeyValuePair<string, int>("SW_FORCEMINIMIZE", 11)
-            };
-
             Console.Write("Handle: ");
             IntPtr hwnd = new IntPtr(int.Parse(Console.ReadLine()));
             Console.Write("Action: ");
@@ -965,19 +985,11 @@ namespace ResetWindow
             }
 
         }
-        static void setForever(Object state)
+        static void SetForever(Object state)
         {
             SetForegroundWindow(new IntPtr(int.Parse(tmp)));
             //Console.WriteLine(new Win32Exception(Marshal.GetLastWin32Error()).Message);
         }
-        /*public bool registerHotKeys()
-        {
-
-        }
-        public bool unregisterHotKeys()
-        {
-
-        }*/
 
         // CMD-Commands
         static void GetCommand(string cmd)
@@ -1033,8 +1045,16 @@ namespace ResetWindow
                     tmp = Console.ReadLine();
                     if (!String.IsNullOrWhiteSpace(tmp))
                     {
-                        t = new Timer(setForever, null, 0, 500);
+                        t = new Timer(SetForever, null, 0, 500);
                         Console.WriteLine(new Win32Exception(Marshal.GetLastWin32Error()).Message);
+                    }
+                    break;
+                case "set config":
+                    Console.Write("Path: ");
+                    tmp = Console.ReadLine();
+                    if (!String.IsNullOrWhiteSpace(tmp))
+                    {
+                        ReadConfig(tmp);
                     }
                     break;
                 case "stop forever":
@@ -1098,7 +1118,7 @@ namespace ResetWindow
                     Console.WriteLine("\t- set forever:\t  Check if window is still in foreground and activate");
                     Console.WriteLine("\t- set rect:\t  Change Position And Dimension Of A Window");
                     Console.WriteLine("\t- set text:\t  Change The Text Of A Window Or Its Childs");
-                    Console.WriteLine("\t- set visible:\t  Set Window Visibility (Foreground or Background)");
+                    //Console.WriteLine("\t- set visible:\t  Set Window Visibility (Foreground or Background)");
                     Console.WriteLine("\t- action:\t  Send an action to the window");
                     Console.WriteLine("");
                     Console.WriteLine("OTHER:");
@@ -1136,6 +1156,35 @@ namespace ResetWindow
             {
                 Environment.Exit(0);
             }
+        }
+
+        private static void ReadConfig(string path)
+        {
+            List<AppBean> apps;
+
+            using (StreamReader r = new StreamReader(path))
+            {
+                string json = r.ReadToEnd();
+                apps = JsonConvert.DeserializeObject<List<AppBean>>(json);
+            }
+
+            apps.ForEach(delegate (AppBean app)
+            {
+                handleAll.Clear();
+                SearchData sdAll = new SearchData { Wndclass = app.Class, Title = app.Title };
+                EnumWindows(new EnumWindowsProc(EnumProcAll), ref sdAll);
+
+                handleAll.ForEach(delegate (SearchData handle)
+                {
+                    ShowWindow(handle.hWnd, SW_SHOW);
+                    ShowWindow(handle.hWnd, SW_NORMAL);
+                    SetForegroundWindow(handle.hWnd);
+                    SetWindowPos(handle.hWnd, 0, app.X, app.Y, app.Width, app.Height, SWP_NOZORDER | SWP_SHOWWINDOW);
+
+                    int iAction = actions.First(kvp => kvp.Key.Equals(app.State.ToUpper())).Value;
+                    ShowWindow(handle.hWnd, iAction);
+                });
+            });
         }
     }
 }
