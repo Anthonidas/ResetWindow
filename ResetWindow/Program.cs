@@ -8,7 +8,6 @@ using System.Threading;
 using System.Text;
 using System.Linq;
 using Newtonsoft.Json;
-using static System.Collections.Specialized.BitVector32;
 using System.Reflection;
 
 namespace ResetWindow
@@ -22,6 +21,8 @@ namespace ResetWindow
         // GET WINDOW TEXT
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+        [DllImport("USER32.DLL")]
+        static extern int GetWindowTextLength(IntPtr hWnd);
 
         // GET CLASS NAME
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -46,6 +47,10 @@ namespace ResetWindow
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool IsWindowVisible(IntPtr hWnd);
+        [DllImport("USER32.DLL")]
+        static extern IntPtr GetShellWindow();
+        [DllImport("User32.dll")]
+        static extern bool IsIconic(IntPtr hwnd);
 
         // SET WINDOW POSITION
         [DllImport("user32.dll", SetLastError = true)]
@@ -327,7 +332,8 @@ namespace ResetWindow
 
                 if (data.Wndclass != null && sb.ToString().ToUpper().Contains(data.Wndclass.ToUpper()))
                 {
-                    StringBuilder sbText = new StringBuilder(1024);
+                    int lLength = 1024; // GetWindowTextLength(hWnd);
+                    StringBuilder sbText = new StringBuilder(lLength);
                     GetWindowText(hWnd, sbText, sbText.Capacity);
                     if (data.Title != null && sbText.ToString().ToUpper().Contains(data.Title.ToUpper()))
                         handleAll.Add(new SearchData { hWnd = hWnd, Title = sbText.ToString(), Wndclass = sb.ToString() });
@@ -365,6 +371,37 @@ namespace ResetWindow
             }
             return true;
         }
+
+        static void GetVisibleWindows()
+        {
+            handleAll.Clear();
+            SearchData searchData = new SearchData();
+
+            EnumWindows(delegate (IntPtr hWnd, ref SearchData sData)
+            {
+                IntPtr shell = GetShellWindow();
+                if (hWnd == shell) return true;
+                if (!IsWindowVisible(hWnd)) return true;
+                if (IsIconic(hWnd)) return true;
+
+                StringBuilder sb = new StringBuilder(1024);
+                GetClassName(hWnd, sb, sb.Capacity);
+
+                int lLength = GetWindowTextLength(hWnd);
+                StringBuilder sbText = new StringBuilder(lLength);
+                GetWindowText(hWnd, sbText, sbText.Capacity + 1);
+                handleAll.Add(new SearchData { hWnd = hWnd, Title = sbText.ToString(), Wndclass = sb.ToString() });
+
+                return true;
+            }, ref searchData);
+
+            for (int i = 0; i < handleAll.Count; i++)
+            {
+                Console.WriteLine(i + 1 + "] " + handleAll[i].Wndclass + ": " + handleAll[i].hWnd + " | " + handleAll[i].Title);
+                log.WriteToLog(i + 1 + "] " + handleAll[i].Wndclass + ": " + handleAll[i].hWnd + " | " + handleAll[i].Title);
+            }
+        }
+
         static void GetRectangle(bool all = false)
         {
             try
@@ -1018,6 +1055,9 @@ namespace ResetWindow
                     break;
                 case "get all":
                     GetRectangle(true);
+                    break;
+                case "get visible":
+                    GetVisibleWindows();
                     break;
                 case "set":
                     prevent = true;
